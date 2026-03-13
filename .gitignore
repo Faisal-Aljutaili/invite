@@ -1,0 +1,4 @@
+backend/target/
+frontend/nextjs/.next/
+frontend/nextjs/node_modules/
+*.tsbuildinfo
