@@ -1,28 +1,37 @@
 'use client';
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
+import toast from 'react-hot-toast';
 import Sidebar from '@/components/Sidebar';
 import AuthGuard from '@/components/AuthGuard';
+import Spinner from '@/components/Spinner';
+import EmptyState from '@/components/EmptyState';
 import { templates } from '@/lib/api';
+import type { TemplateData } from '@/lib/types';
 
 export default function TemplatesPage() {
-  const [list, setList] = useState<any[]>([]);
+  const [list, setList] = useState<TemplateData[]>([]);
   const [loading, setLoading] = useState(true);
 
-  const load = () => templates.list().then((r: any) => { setList(r); setLoading(false); });
+  const load = () => templates.list().then(setList).finally(() => setLoading(false));
   useEffect(() => { load(); }, []);
 
   async function handleDelete(id: string) {
     if (!confirm('Delete this template?')) return;
-    await templates.delete(id);
-    load();
+    try {
+      await templates.delete(id);
+      setList(prev => prev.filter(t => t.id !== id));
+      toast.success('Template deleted');
+    } catch (err: any) {
+      toast.error(err.message);
+    }
   }
 
   return (
     <AuthGuard>
       <div className="flex min-h-screen">
         <Sidebar />
-        <main className="flex-1 p-8">
+        <main className="flex-1 p-8 pt-16 lg:pt-8">
           <div className="flex items-center justify-between mb-8">
             <div>
               <h2 className="text-2xl font-bold text-gray-900">Templates</h2>
@@ -32,16 +41,18 @@ export default function TemplatesPage() {
           </div>
 
           {loading ? (
-            <div className="text-center py-20 text-gray-400">Loading…</div>
+            <Spinner />
           ) : list.length === 0 ? (
-            <div className="card text-center py-20">
-              <p className="text-4xl mb-4">📝</p>
-              <p className="text-gray-500">No templates yet.</p>
-              <Link href="/templates/new" className="btn-primary inline-block mt-4">Create Template</Link>
-            </div>
+            <EmptyState
+              icon="📝"
+              title="No templates yet"
+              description="Create a markdown template to reuse across events."
+              actionLabel="Create Template"
+              actionHref="/templates/new"
+            />
           ) : (
             <div className="grid gap-4">
-              {list.map((t: any) => (
+              {list.map(t => (
                 <div key={t.id} className="card">
                   <div className="flex items-start justify-between">
                     <div className="flex-1 min-w-0 mr-4">

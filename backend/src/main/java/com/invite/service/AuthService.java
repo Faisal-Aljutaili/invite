@@ -11,8 +11,8 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.security.SecureRandom;
 import java.time.LocalDateTime;
-import java.util.Random;
 
 @Service
 @RequiredArgsConstructor
@@ -60,10 +60,18 @@ public class AuthService {
         User user = userRepository.findByEmail(req.getEmail())
                 .orElseThrow(() -> new IllegalArgumentException("No account with that email"));
 
+        // Rate limit: reject if user has an unexpired, unused OTP
+        otpTokenRepository
+                .findTopByUserAndUsedFalseOrderByCreatedAtDesc(user)
+                .ifPresent(existing -> {
+                    if (existing.getExpiresAt().isAfter(LocalDateTime.now().minusMinutes(9)))
+                        throw new IllegalStateException("OTP already sent. Wait before requesting a new one.");
+                });
+
         // Invalidate old OTPs
         otpTokenRepository.deleteByUser(user);
 
-        String otp = String.format("%06d", new Random().nextInt(999999));
+        String otp = String.format("%06d", new SecureRandom().nextInt(999999));
         OtpToken token = OtpToken.builder()
                 .user(user)
                 .otp(otp)

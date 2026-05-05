@@ -2,13 +2,16 @@
 import { useEffect, useState } from 'react';
 import { useParams } from 'next/navigation';
 import ReactMarkdown from 'react-markdown';
+import toast from 'react-hot-toast';
+import Spinner from '@/components/Spinner';
 import { publicInvite } from '@/lib/api';
+import type { PublicInviteData, InviteeData } from '@/lib/types';
 
-type Status = 'PENDING' | 'ACCEPTED' | 'DECLINED' | 'NO_RESPONSE';
+type Status = InviteeData['status'];
 
 export default function PublicInvitePage() {
   const { id } = useParams<{ id: string }>();
-  const [data, setData] = useState<any>(null);
+  const [data, setData] = useState<PublicInviteData | null>(null);
   const [loading, setLoading] = useState(true);
   const [responding, setResponding] = useState(false);
   const [error, setError] = useState('');
@@ -16,7 +19,7 @@ export default function PublicInvitePage() {
   useEffect(() => {
     publicInvite.get(id)
       .then(setData)
-      .catch(() => setError('Invite not found.'))
+      .catch(err => setError(err.message || 'Invite not found.'))
       .finally(() => setLoading(false));
   }, [id]);
 
@@ -24,9 +27,10 @@ export default function PublicInvitePage() {
     setResponding(true);
     try {
       const res = await publicInvite.respond(id, status);
-      setData((d: any) => ({ ...d, invitee: res }));
+      setData(d => d ? { ...d, invitee: res } : d);
+      toast.success(status === 'ACCEPTED' ? 'See you there!' : 'Response recorded.');
     } catch (err: any) {
-      setError(err.error || err.message || 'Something went wrong');
+      toast.error(err.message || 'Something went wrong');
     } finally {
       setResponding(false);
     }
@@ -35,7 +39,7 @@ export default function PublicInvitePage() {
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-brand-50 to-white">
-        <div className="text-brand-600 text-xl animate-pulse">Loading invite…</div>
+        <Spinner />
       </div>
     );
   }

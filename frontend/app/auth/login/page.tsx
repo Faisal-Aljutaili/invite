@@ -1,37 +1,59 @@
 'use client';
-import { useState } from 'react';
+import { Suspense, useState, useRef, useEffect } from 'react';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { auth } from '@/lib/api';
 import { saveToken } from '@/lib/auth';
+import type { AuthResponse } from '@/lib/types';
 
 type Tab = 'password' | 'otp';
 type OtpStep = 'request' | 'verify';
 
 export default function LoginPage() {
+  return (
+    <Suspense>
+      <LoginForm />
+    </Suspense>
+  );
+}
+
+function LoginForm() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [tab, setTab] = useState<Tab>('password');
   const [otpStep, setOtpStep] = useState<OtpStep>('request');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
 
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [otp, setOtp] = useState('');
 
-  async function handlePassword(e: React.FormEvent) {
-    e.preventDefault();
+  const emailRef = useRef<HTMLInputElement>(null);
+  const otpRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => { emailRef.current?.focus(); }, []);
+
+  const redirect = searchParams.get('redirect') || '/dashboard';
+
+  async function loginAndRedirect(promise: Promise<AuthResponse>) {
     setError('');
     setLoading(true);
     try {
-      const res: any = await auth.login({ email, password });
+      const res = await promise;
       saveToken(res.token);
-      router.push('/dashboard');
+      router.push(redirect);
     } catch (err: any) {
       setError(err.message);
     } finally {
       setLoading(false);
     }
+  }
+
+  async function handlePassword(e: React.FormEvent) {
+    e.preventDefault();
+    await loginAndRedirect(auth.login({ email, password }));
   }
 
   async function handleOtpRequest(e: React.FormEvent) {
@@ -41,6 +63,7 @@ export default function LoginPage() {
     try {
       await auth.requestOtp({ email });
       setOtpStep('verify');
+      setTimeout(() => otpRef.current?.focus(), 100);
     } catch (err: any) {
       setError(err.message);
     } finally {
@@ -50,17 +73,7 @@ export default function LoginPage() {
 
   async function handleOtpVerify(e: React.FormEvent) {
     e.preventDefault();
-    setError('');
-    setLoading(true);
-    try {
-      const res: any = await auth.verifyOtp({ email, otp });
-      saveToken(res.token);
-      router.push('/dashboard');
-    } catch (err: any) {
-      setError(err.message);
-    } finally {
-      setLoading(false);
-    }
+    await loginAndRedirect(auth.verifyOtp({ email, otp }));
   }
 
   return (
@@ -95,13 +108,22 @@ export default function LoginPage() {
             <form onSubmit={handlePassword} className="space-y-4">
               <div>
                 <label className="label">Email</label>
-                <input className="input" type="email" value={email}
+                <input ref={emailRef} className="input" type="email" value={email}
                   onChange={e => setEmail(e.target.value)} required />
               </div>
               <div>
                 <label className="label">Password</label>
-                <input className="input" type="password" value={password}
-                  onChange={e => setPassword(e.target.value)} required />
+                <div className="relative">
+                  <input className="input pr-10" type={showPassword ? 'text' : 'password'} value={password}
+                    onChange={e => setPassword(e.target.value)} required />
+                  <button type="button"
+                    onClick={() => setShowPassword(p => !p)}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 text-sm"
+                    tabIndex={-1}
+                  >
+                    {showPassword ? '🙈' : '👁'}
+                  </button>
+                </div>
               </div>
               <button type="submit" disabled={loading} className="btn-primary w-full">
                 {loading ? 'Signing in…' : 'Sign in'}
@@ -113,7 +135,7 @@ export default function LoginPage() {
             <form onSubmit={handleOtpRequest} className="space-y-4">
               <div>
                 <label className="label">Email</label>
-                <input className="input" type="email" value={email}
+                <input ref={emailRef} className="input" type="email" value={email}
                   onChange={e => setEmail(e.target.value)} required />
               </div>
               <button type="submit" disabled={loading} className="btn-primary w-full">
@@ -127,7 +149,7 @@ export default function LoginPage() {
               <p className="text-sm text-gray-600">OTP sent to <strong>{email}</strong></p>
               <div>
                 <label className="label">6-digit code</label>
-                <input className="input text-center text-2xl tracking-widest" type="text"
+                <input ref={otpRef} className="input text-center text-2xl tracking-widest" type="text"
                   maxLength={6} value={otp} onChange={e => setOtp(e.target.value)} required />
               </div>
               <button type="submit" disabled={loading} className="btn-primary w-full">

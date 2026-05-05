@@ -12,4 +12,5 @@ public interface InviteeRepository extends JpaRepository<Invitee, String> {
     List<Invitee> findByEventAndSentAtIsNull(Event event);
     List<Invitee> findByEventAndStatus(Event event, InviteeStatus status);
     int countByEvent(Event event);
+    long countByEventAndSentAtIsNull(Event event);
 }

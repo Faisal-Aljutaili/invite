@@ -6,6 +6,7 @@ import com.invite.model.Event;
 import com.invite.model.Template;
 import com.invite.model.User;
 import com.invite.repository.EventRepository;
+import com.invite.repository.InviteeRepository;
 import com.invite.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -19,6 +20,7 @@ public class EventService {
 
     private final EventRepository eventRepository;
     private final UserRepository userRepository;
+    private final InviteeRepository inviteeRepository;
     private final TemplateService templateService;
 
     @Transactional
@@ -57,8 +59,19 @@ public class EventService {
         return EventResponse.from(event);
     }
 
+    @Transactional
     public void delete(User user, String id) {
-        eventRepository.delete(findOwned(user, id));
+        Event event = findOwned(user, id);
+
+        // Refund unused invites (only for unsent invitees)
+        long unsentCount = inviteeRepository.countByEventAndSentAtIsNull(event);
+        int refund = event.getNumberOfInvites() - (int) unsentCount;
+        if (refund > 0) {
+            user.setAvailableNumberOfInvites(user.getAvailableNumberOfInvites() + refund);
+            userRepository.save(user);
+        }
+
+        eventRepository.delete(event);
     }
 
     public Event findOwned(User user, String id) {

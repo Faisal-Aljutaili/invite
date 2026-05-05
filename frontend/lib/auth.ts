@@ -14,3 +14,9 @@ export function getToken(): string | null {
 export function isLoggedIn(): boolean {
   return !!getToken();
 }
+
+export function getRedirectUrl(): string {
+  if (typeof window === 'undefined') return '/dashboard';
+  const params = new URLSearchParams(window.location.search);
+  return params.get('redirect') || '/dashboard';
+}

@@ -1,25 +1,32 @@
 'use client';
-import { useState } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { auth } from '@/lib/api';
 import { saveToken } from '@/lib/auth';
+import type { AuthResponse } from '@/lib/types';
 
 export default function RegisterPage() {
   const router = useRouter();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
   const [form, setForm] = useState({ userName: '', email: '', phoneNumber: '', password: '' });
 
-  const update = (k: string) => (e: React.ChangeEvent<HTMLInputElement>) =>
+  const userNameRef = useRef<HTMLInputElement>(null);
+  useEffect(() => { userNameRef.current?.focus(); }, []);
+
+  const update = (k: string) => (e: React.ChangeEvent<HTMLInputElement>) => {
     setForm(f => ({ ...f, [k]: e.target.value }));
+    if (error) setError('');
+  };
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setError('');
     setLoading(true);
     try {
-      const res: any = await auth.register(form);
+      const res: AuthResponse = await auth.register(form);
       saveToken(res.token);
       router.push('/dashboard');
     } catch (err: any) {
@@ -45,7 +52,7 @@ export default function RegisterPage() {
           <form onSubmit={handleSubmit} className="space-y-4">
             <div>
               <label className="label">Username</label>
-              <input className="input" type="text" value={form.userName}
+              <input ref={userNameRef} className="input" type="text" value={form.userName}
                 onChange={update('userName')} required minLength={3} />
             </div>
             <div>
@@ -54,14 +61,24 @@ export default function RegisterPage() {
                 onChange={update('email')} required />
             </div>
             <div>
-              <label className="label">Phone Number</label>
+              <label className="label">Phone Number (optional)</label>
               <input className="input" type="tel" value={form.phoneNumber}
-                onChange={update('phoneNumber')} placeholder="+1234567890" required />
+                onChange={update('phoneNumber')} placeholder="+1234567890"
+                pattern="^\+?[1-9]\d{7,14}$" />
             </div>
             <div>
               <label className="label">Password</label>
-              <input className="input" type="password" value={form.password}
-                onChange={update('password')} required minLength={6} />
+              <div className="relative">
+                <input className="input pr-10" type={showPassword ? 'text' : 'password'} value={form.password}
+                  onChange={update('password')} required minLength={6} />
+                <button type="button"
+                  onClick={() => setShowPassword(p => !p)}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 text-sm"
+                  tabIndex={-1}
+                >
+                  {showPassword ? '🙈' : '👁'}
+                </button>
+              </div>
             </div>
             <button type="submit" disabled={loading} className="btn-primary w-full">
               {loading ? 'Creating account…' : 'Create account'}
